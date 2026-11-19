@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="fr">
   <head>
@@ -83,7 +82,11 @@
             Ajouter une recette
           </h2>
 
-          <form id="recipe-form" class="flex flex-col gap-4">
+          <form
+            id="recipe-form"
+            class="flex flex-col gap-4"
+            novalidate
+          >
 
             <!-- Nom de la recette -->
             <div>
@@ -216,15 +219,15 @@
               </button>
             </div>
           </form>
-
-          <!-- Message de succès -->
-          <p
-            id="success-message"
-            class="text-green-600 mt-4"
-            role="status"
-            aria-live="polite"
-          ></p>
         </dialog>
+
+        <!-- Message de succès -->
+        <p
+          id="success-message"
+          class="text-green-600 mt-4"
+          role="status"
+          aria-live="polite"
+        ></p>
       </div>
 
       <!-- Chargement -->
