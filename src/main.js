@@ -1,11 +1,16 @@
 import "./style.css";
-import { getRecipes } from "./api.js";
+import { getRecipes, searchRecipes } from "./api.js";
 
 // 1. Select HTML elements
 const recipesContainer = document.getElementById("recipes-container");
 const recipeCount = document.getElementById("recipe-count");
 const loading = document.getElementById("loading");
 const error = document.getElementById("error");
+
+const searchInput = document.getElementById("search-input");
+const searchButton = document.getElementById("search-button");
+const noResults = document.getElementById("no-results");
+const showAllButton = document.getElementById("show-all-button");
 
 // 2. Display recipes
 const displayRecipes = (recipes) => {
@@ -56,10 +61,11 @@ const displayRecipes = (recipes) => {
   recipeCount.textContent = recipes.length;
 };
 
-// 3. Fetch recipes
+// 3. Fetch all recipes
 const loadRecipes = async () => {
   loading.classList.remove("hidden");
   error.classList.add("hidden");
+  noResults.classList.add("hidden");
 
   try {
     const recipes = await getRecipes();
@@ -73,5 +79,53 @@ const loadRecipes = async () => {
   }
 };
 
-// 4. Start the application
+// 4. Search recipes
+const handleSearch = async () => {
+  const keyword = searchInput.value.trim();
+
+  if (!keyword) {
+    loadRecipes();
+    return;
+  }
+
+  loading.classList.remove("hidden");
+  error.classList.add("hidden");
+  noResults.classList.add("hidden");
+
+  try {
+    const recipes = await searchRecipes(keyword);
+
+    if (recipes.length === 0) {
+      recipesContainer.replaceChildren();
+      recipeCount.textContent = 0;
+      noResults.classList.remove("hidden");
+      return;
+    }
+
+    displayRecipes(recipes);
+  } catch (err) {
+    console.error("Error searching recipes:", err);
+    error.classList.remove("hidden");
+  } finally {
+    loading.classList.add("hidden");
+  }
+};
+
+// 5. Search button
+searchButton.addEventListener("click", handleSearch);
+
+// Search when pressing Enter
+searchInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    handleSearch();
+  }
+});
+
+// 6. Show all recipes again
+showAllButton.addEventListener("click", () => {
+  searchInput.value = "";
+  loadRecipes();
+});
+
+// 7. Start application
 loadRecipes();
