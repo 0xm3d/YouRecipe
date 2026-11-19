@@ -1,7 +1,9 @@
 import "./style.css";
-import { getRecipes, searchRecipes, addRecipe } from "./api.js";
-import { validateRecipe } from "./validation.js";
 import newRecipeImage from "./assets/new-recipe.jpg";
+
+import { getRecipes, searchRecipes, addRecipe, deleteRecipe } from "./api.js";
+
+import { validateRecipe } from "./validation.js";
 
 // 1. Select HTML elements
 const recipesContainer = document.getElementById("recipes-container");
@@ -27,7 +29,7 @@ const recipeCuisine = document.getElementById("recipe-cuisine");
 const recipeDifficulty = document.getElementById("recipe-difficulty");
 const recipeTime = document.getElementById("recipe-time");
 
-// Error messages
+// Validation messages
 const nameError = document.getElementById("name-error");
 const cuisineError = document.getElementById("cuisine-error");
 const difficultyError = document.getElementById("difficulty-error");
@@ -36,6 +38,9 @@ const timeError = document.getElementById("time-error");
 // Submit and success
 const submitButton = document.getElementById("submit-button");
 const successMessage = document.getElementById("success-message");
+
+// Retry button
+const retryButton = document.getElementById("retry-button");
 
 // 2. Create a recipe card
 const createRecipeCard = (recipe) => {
@@ -80,8 +85,49 @@ const createRecipeCard = (recipe) => {
   prepTime.textContent = `Preparation: ${recipe.prepTimeMinutes} minutes`;
   prepTime.className = "text-text text-sm";
 
+  // Delete button
+  const deleteButton = document.createElement("button");
+
+  deleteButton.textContent = "Supprimer";
+  deleteButton.type = "button";
+  deleteButton.className =
+    "bg-red-600 text-white px-4 py-2 my-auto rounded-lg mt-4 hover:bg-red-700";
+
+  deleteButton.addEventListener("click", async () => {
+    const confirmed = confirm(
+      `Voulez-vous vraiment supprimer "${recipe.name}" ?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    deleteButton.disabled = true;
+    deleteButton.textContent = "Suppression...";
+
+    try {
+      await deleteRecipe(recipe.id);
+
+      card.remove();
+
+      recipeCount.textContent = Number(recipeCount.textContent) - 1;
+
+      successMessage.textContent = "La recette a été supprimée avec succès !";
+
+      noResults.classList.add("hidden");
+    } catch (err) {
+      console.error("Error deleting recipe:", err);
+
+      successMessage.textContent =
+        "Impossible de supprimer cette recette. Veuillez réessayer.";
+
+      deleteButton.disabled = false;
+      deleteButton.textContent = "Supprimer";
+    }
+  });
+
   // Append elements
-  content.append(name, cuisine, difficulty, prepTime);
+  content.append(name, cuisine, difficulty, prepTime, deleteButton);
   card.append(image, content);
 
   return card;
@@ -219,7 +265,7 @@ recipeForm.addEventListener("submit", async (event) => {
     noResults.classList.add("hidden");
     error.classList.add("hidden");
 
-    // Add the new recipe at the top
+    // Create and display new recipe card
     const newCard = createRecipeCard(addedRecipe);
     recipesContainer.prepend(newCard);
 
@@ -235,17 +281,15 @@ recipeForm.addEventListener("submit", async (event) => {
     successMessage.textContent = "La recette a été ajoutée avec succès !";
   } catch (err) {
     console.error("Error adding recipe:", err);
+
     successMessage.textContent = "Une erreur est survenue. Veuillez réessayer.";
   } finally {
-    // Enable submit button again
     submitButton.disabled = false;
-    submitButton.textContent = "Ajouter la recette";
+    submitButton.textContent = "Ajouter";
   }
 });
 
 // 12. Retry loading recipes
-const retryButton = document.getElementById("retry-button");
-
 retryButton.addEventListener("click", () => {
   loadRecipes();
 });

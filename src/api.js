@@ -29,3 +29,10 @@ export const addRecipe = async (recipe) => {
 
   return response.data;
 };
+
+//Delete recipe
+export const deleteRecipe = async (id) => {
+  const response = await api.delete(`/recipes/${id}`);
+
+  return response.data;
+};
