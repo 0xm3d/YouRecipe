@@ -22,3 +22,10 @@ export const searchRecipes = async (keyword) => {
 
   return response.data.recipes;
 };
+
+//Add recipe
+export const addRecipe = async (recipe) => {
+  const response = await api.post("/recipes/add", recipe);
+
+  return response.data;
+};
