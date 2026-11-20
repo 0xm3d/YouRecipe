@@ -42,7 +42,24 @@ const successMessage = document.getElementById("success-message");
 // Retry button
 const retryButton = document.getElementById("retry-button");
 
-// 2. Create a recipe card
+// 2. Local Storage functions
+const getAddedRecipes = () => {
+  return JSON.parse(localStorage.getItem("yourecipe-added-recipes") || "[]");
+};
+
+const saveAddedRecipes = (recipes) => {
+  localStorage.setItem("yourecipe-added-recipes", JSON.stringify(recipes));
+};
+
+const getDeletedRecipes = () => {
+  return JSON.parse(localStorage.getItem("yourecipe-deleted-recipes") || "[]");
+};
+
+const saveDeletedRecipes = (ids) => {
+  localStorage.setItem("yourecipe-deleted-recipes", JSON.stringify(ids));
+};
+
+// 3. Create a recipe card
 const createRecipeCard = (recipe) => {
   const card = document.createElement("article");
 
@@ -52,12 +69,7 @@ const createRecipeCard = (recipe) => {
   // Image
   const image = document.createElement("img");
 
-  if (recipe.image) {
-    image.src = recipe.image;
-  } else {
-    image.src = newRecipeImage;
-  }
-
+  image.src = recipe.image || newRecipeImage;
   image.alt = recipe.name;
   image.className = "w-full h-48 object-cover";
 
@@ -72,17 +84,17 @@ const createRecipeCard = (recipe) => {
 
   // Cuisine
   const cuisine = document.createElement("p");
-  cuisine.textContent = `Cuisine: ${recipe.cuisine}`;
+  cuisine.textContent = `Cuisine : ${recipe.cuisine}`;
   cuisine.className = "text-text text-sm mb-2";
 
   // Difficulty
   const difficulty = document.createElement("p");
-  difficulty.textContent = `Difficulty: ${recipe.difficulty}`;
+  difficulty.textContent = `Difficulté : ${recipe.difficulty}`;
   difficulty.className = "text-text text-sm mb-2";
 
   // Preparation time
   const prepTime = document.createElement("p");
-  prepTime.textContent = `Preparation: ${recipe.prepTimeMinutes} minutes`;
+  prepTime.textContent = `Préparation : ${recipe.prepTimeMinutes} minutes`;
   prepTime.className = "text-text text-sm";
 
   // Delete button
@@ -98,23 +110,43 @@ const createRecipeCard = (recipe) => {
       `Voulez-vous vraiment supprimer "${recipe.name}" ?`,
     );
 
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     deleteButton.disabled = true;
     deleteButton.textContent = "Suppression...";
 
     try {
-      await deleteRecipe(recipe.id);
+      const addedRecipes = getAddedRecipes();
 
+      // Check whether the recipe was added by the user
+      const isAddedRecipe = addedRecipes.some((item) => item.id === recipe.id);
+
+      if (isAddedRecipe) {
+        // Remove directly from Local Storage
+        const updatedRecipes = addedRecipes.filter(
+          (item) => item.id !== recipe.id,
+        );
+
+        saveAddedRecipes(updatedRecipes);
+      } else {
+        // Delete original recipe through Axios
+        await deleteRecipe(recipe.id);
+
+        // Remember deleted original recipe
+        const deletedRecipes = getDeletedRecipes();
+
+        if (!deletedRecipes.includes(recipe.id)) {
+          deletedRecipes.push(recipe.id);
+          saveDeletedRecipes(deletedRecipes);
+        }
+      }
+
+      // Update interface
       card.remove();
 
       recipeCount.textContent = Number(recipeCount.textContent) - 1;
 
       successMessage.textContent = "La recette a été supprimée avec succès !";
-
-      noResults.classList.add("hidden");
     } catch (err) {
       console.error("Error deleting recipe:", err);
 
@@ -126,14 +158,13 @@ const createRecipeCard = (recipe) => {
     }
   });
 
-  // Append elements
   content.append(name, cuisine, difficulty, prepTime, deleteButton);
   card.append(image, content);
 
   return card;
 };
 
-// 3. Display recipes
+// 4. Display recipes
 const displayRecipes = (recipes) => {
   recipesContainer.replaceChildren();
 
@@ -145,15 +176,33 @@ const displayRecipes = (recipes) => {
   recipeCount.textContent = recipes.length;
 };
 
-// 4. Fetch all recipes
+// 5. Fetch and display all recipes
 const loadRecipes = async () => {
   loading.classList.remove("hidden");
   error.classList.add("hidden");
   noResults.classList.add("hidden");
 
   try {
-    const recipes = await getRecipes();
-    displayRecipes(recipes);
+    // Get original recipes from API
+    const apiRecipes = await getRecipes();
+
+    // Get Local Storage data
+    const addedRecipes = getAddedRecipes();
+    const deletedRecipes = getDeletedRecipes();
+
+    // Remove deleted original recipes
+    const filteredRecipes = apiRecipes.filter(
+      (recipe) => !deletedRecipes.includes(recipe.id),
+    );
+
+    // Combine added and original recipes
+    const allRecipes = [...addedRecipes, ...filteredRecipes];
+
+    displayRecipes(allRecipes);
+
+    if (allRecipes.length === 0) {
+      noResults.classList.remove("hidden");
+    }
   } catch (err) {
     console.error("Error loading recipes:", err);
     error.classList.remove("hidden");
@@ -162,7 +211,7 @@ const loadRecipes = async () => {
   }
 };
 
-// 5. Search recipes
+// 6. Search recipes
 const handleSearch = async () => {
   const keyword = searchInput.value.trim();
 
@@ -176,16 +225,31 @@ const handleSearch = async () => {
   noResults.classList.add("hidden");
 
   try {
-    const recipes = await searchRecipes(keyword);
+    // Search original recipes through API
+    const apiRecipes = await searchRecipes(keyword);
 
-    if (recipes.length === 0) {
-      recipesContainer.replaceChildren();
-      recipeCount.textContent = 0;
+    // Get Local Storage data
+    const addedRecipes = getAddedRecipes();
+    const deletedRecipes = getDeletedRecipes();
+
+    // Filter deleted original recipes
+    const filteredApiRecipes = apiRecipes.filter(
+      (recipe) => !deletedRecipes.includes(recipe.id),
+    );
+
+    // Search added recipes locally
+    const filteredAddedRecipes = addedRecipes.filter((recipe) =>
+      recipe.name.toLowerCase().includes(keyword.toLowerCase()),
+    );
+
+    // Combine results
+    const allResults = [...filteredAddedRecipes, ...filteredApiRecipes];
+
+    displayRecipes(allResults);
+
+    if (allResults.length === 0) {
       noResults.classList.remove("hidden");
-      return;
     }
-
-    displayRecipes(recipes);
   } catch (err) {
     console.error("Error searching recipes:", err);
     error.classList.remove("hidden");
@@ -194,7 +258,7 @@ const handleSearch = async () => {
   }
 };
 
-// 6. Display validation errors
+// 7. Display validation errors
 const displayErrors = (errors) => {
   nameError.textContent = errors.name || "";
   cuisineError.textContent = errors.cuisine || "";
@@ -202,38 +266,36 @@ const displayErrors = (errors) => {
   timeError.textContent = errors.time || "";
 };
 
-// 7. Search button
+// 8. Search button
 searchButton.addEventListener("click", handleSearch);
 
-// Search when pressing Enter
 searchInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     handleSearch();
   }
 });
 
-// 8. Show all recipes again
+// 9. Show all recipes
 showAllButton.addEventListener("click", () => {
   searchInput.value = "";
   loadRecipes();
 });
 
-// 9. Open dialog
+// 10. Open dialog
 addButton.addEventListener("click", () => {
   successMessage.textContent = "";
   recipeDialog.showModal();
 });
 
-// 10. Close dialog
+// 11. Close dialog
 closeDialogButton.addEventListener("click", () => {
   recipeDialog.close();
 });
 
-// 11. Handle recipe form submission
+// 12. Handle recipe form submission
 recipeForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  // Collect form values
   const recipe = {
     name: recipeName.value.trim(),
     cuisine: recipeCuisine.value.trim(),
@@ -245,39 +307,38 @@ recipeForm.addEventListener("submit", async (event) => {
   const errors = validateRecipe(recipe);
   displayErrors(errors);
 
-  // Stop if there are validation errors
-  if (Object.keys(errors).length > 0) {
-    return;
-  }
+  if (Object.keys(errors).length > 0) return;
 
-  // Disable submit button
   submitButton.disabled = true;
   submitButton.textContent = "Ajout en cours...";
 
   try {
-    // Send recipe to API
+    // Send POST request
     const addedRecipe = await addRecipe(recipe);
+    // Save new recipe in Local Storage
+    const addedRecipes = getAddedRecipes();
 
-    console.log("Recipe added:", addedRecipe);
+    addedRecipes.unshift(addedRecipe);
 
-    // Clear search and show all recipes
+    saveAddedRecipes(addedRecipes);
+
+    // Clear search
     searchInput.value = "";
     noResults.classList.add("hidden");
     error.classList.add("hidden");
 
-    // Create and display new recipe card
+    // Display new recipe
     const newCard = createRecipeCard(addedRecipe);
     recipesContainer.prepend(newCard);
 
-    // Update recipe count
+    // Update count
     recipeCount.textContent = Number(recipeCount.textContent) + 1;
 
-    // Reset form and close dialog
+    // Reset form
     recipeForm.reset();
     displayErrors({});
     recipeDialog.close();
 
-    // Show success message
     successMessage.textContent = "La recette a été ajoutée avec succès !";
   } catch (err) {
     console.error("Error adding recipe:", err);
@@ -289,10 +350,10 @@ recipeForm.addEventListener("submit", async (event) => {
   }
 });
 
-// 12. Retry loading recipes
+// 13. Retry loading recipes
 retryButton.addEventListener("click", () => {
   loadRecipes();
 });
 
-// 13. Start application
+// 14. Start application
 loadRecipes();
